@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Kehadiran</title>
+
+<style>
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #f4f6f9;
+    padding: 10px 0;
+    text-align: center;
+}
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin-top: 120px;
+}
+.card {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0px 5px 15px rgba(0,0,0,0.1);
+    text-align: center;
+}
+input, select {
+    padding: 10px;
+    width: 250px;
+    margin-top: 10px;
+}
+button {
+    padding: 10px 20px;
+    margin-top: 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover { background-color: #45a049; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h2>Kursus Tatacara Perolehan Program Kesihatan Awam</h2>
+</header>
+
+<div class="card">
+    <h3>Borang Kehadiran</h3>
+
+    <!-- FORM (your edited version retained) -->
+    <form id="attendanceForm">
+        <input type="text" name="nama" placeholder="Nama penuh" required><br>
+        <input type="text" name="nokp" placeholder="No Kad Pengenalan" required><br>
+        <input type="email" name="email" placeholder="Emel rasmi" required><br><br>
+
+        <select name="tarikh" required>
+            <option value="">Pilih tarikh</option>
+            <option value="11/02/2026">11 Februari 2026</option>
+            <option value="12/02/2026">12 Februari 2026</option>
+            <option value="13/02/2026">13 Februari 2026</option>
+        </select><br>
+
+        <button type="submit">Submit</button>
+    </form>
+</div>
+
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbzDzaVUuaL0nq4_x4XZq3rGZsGvAiYqDPCWgk_p0Vs4K7HY6Ac1YVNZMEWCSWyEgLHF/exec";
+
+document.getElementById("attendanceForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const formData = {
+        nama: this.nama.value,
+        nokp: this.nokp.value,
+        email: this.email.value,
+        tarikh: this.tarikh.value
+    };
+
+    fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.text())
+    .then(data => {
+        alert(data);
+        this.reset();
+    })
+    .catch(error => {
+        alert("Ralat menghantar data");
+    });
+});
+</script>
+
+</body>
+</html>
