@@ -1,0 +1,173 @@
+from flask import Flask, request, render_template_string
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+import os  
+
+app = Flask(__name__)
+
+scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+
+creds_json = os.environ.get('GOOGLE_CREDENTIALS')  
+if creds_json:
+    creds = Credentials.from_service_account_info(eval("credentials.json"), scopes=scope)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key("1GbLfHpdrQE8ifTVQqIpvOope6uFf-J8vs-eU0_MwgS8").sheet1  
+else:
+    raise ValueError("GOOGLE_CREDENTIALS not set")
+
+
+if __name__ == "__main__":
+    app.run(debug=False)  
+
+# =====================
+# Google Sheets Setup
+# =======================
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+try:
+    creds = Credentials.from_service_account_file(
+        "credentials.json",
+        scopes=scope
+    )
+    client = gspread.authorize(creds)
+except Exception as e:
+    print(f"Ralat dalam credentials: {e}")
+    exit(1)  # Hentikan aplikasi jika credentials gagal
+
+sheet_id = "1GbLfHpdrQE8ifTVQqIpvOope6uFf-J8vs-eU0_MwgS8"  # ID spreadsheet anda
+
+try:
+    sheet = client.open_by_key(sheet_id).sheet1  # Gunakan open_by_key untuk ID
+    print("Berjaya menyambung ke Google Sheets!")
+except gspread.SpreadsheetNotFound:
+    print(f"Spreadsheet dengan ID {sheet_id} tidak dijumpai. Pastikan ID betul dan dikongsi dengan service account.")
+    exit(1)
+except Exception as e:
+    print(f"Ralat menyambung ke Google Sheets: {e}")
+    exit(1)
+
+# Tambah header jika belum ada
+headers = ["Nama", "No K/P", "Email", "Tarikh", "Waktu", "Completed"]
+try:
+    if sheet.row_count == 0 or sheet.row_values(1) != headers:
+        sheet.insert_row(headers, 1)
+        print("Header ditambah ke spreadsheet.")
+except Exception as e:
+    print(f"Ralat menambah header: {e}")
+
+REQUIRED_DATES = {"11/02/2026", "12/02/2026", "13/02/2026"}
+
+# =======================
+# HTML Page
+# =======================
+html_page = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sistem Kehadiran</title>
+    <style>
+    header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: #f4f6f9;
+        padding: 10px 0;
+        text-align: center;
+        z-index: 1000;
+    }
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f6f9;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin-top: 100px; 
+    }
+    img { width: 250px; display: block; margin: 20px auto; }
+    .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0px 5px 15px rgba(0,0,0,0.1); text-align: center; }
+    input, select { padding: 10px; width: 250px; margin-top: 10px; }
+    button { padding: 10px 20px; margin-top: 15px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Kursus Tatacara Perolehan Program Kesihatan Awam</h1>
+    <img src="https://github.com/rizayahaya/attendance_web/blob/main/KKM.png?raw=true" alt="KKM">
+</header>
+<div class="card">
+    <h2>Borang Kehadiran</h2>
+    <form method="POST">
+        <input type="text" name="nama" placeholder="Masukkan nama penuh anda" required><br>
+        <input type="text" name="nokp" placeholder="Masukkan No Kad Pengenalan anda" required><br>
+        <input type="email" name="email" placeholder="Masukkan alamat Emel rasmi anda" required><br><br>
+        <label for="tarikh">Pilih Tarikh Kehadiran:</label><br>
+        <select name="tarikh" id="tarikh" required>
+            <option value="">Pilih tarikh</option>
+            <option value="11/02/2026">11 Februari 2026</option>
+            <option value="12/02/2026">12 Februari 2026</option>
+            <option value="13/02/2026">13 Februari 2026</option>
+        </select><br>
+        <button type="submit">Submit</button>
+    </form>
+</div>
+</body>
+</html>
+"""
+
+# =======================
+# Flask Route
+# =======================
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "POST":
+        nama = request.form["nama"]
+        nokp = request.form["nokp"]
+        email = request.form["email"]
+        tarikh = request.form["tarikh"]
+        waktu = datetime.now().strftime("%H:%M:%S")
+
+        try:
+            # Simpan data ke Google Sheets
+            sheet.append_row([nama, nokp, email, tarikh, waktu, ""])
+            print(f"Data disimpan: {nama}, {nokp}, {tarikh}")
+
+            # Semak kehadiran penuh (pilihan)
+            all_rows = sheet.get_all_records()
+            attendance_dict = {}
+            for row in all_rows:
+                key = row["No K/P"]
+                if key not in attendance_dict:
+                    attendance_dict[key] = set()
+                attendance_dict[key].add(row["Tarikh"])
+
+            dates_attended = attendance_dict.get(nokp, set())
+            full_attendance = REQUIRED_DATES.issubset(dates_attended)
+
+            if full_attendance:
+                cell_list = sheet.findall(nokp)
+                for cell in cell_list:
+                    sheet.update_cell(cell.row, 6, "YES")
+                message = f"Terima kasih {nama}, anda telah hadir semua hari. Layak terima sijil!"
+            else:
+                message = f"Terima kasih {nama}, kehadiran anda pada {tarikh} jam {waktu} telah direkod!"
+
+        except Exception as e:
+            message = f"Ralat menyimpan data: {e}. Cuba lagi."
+            print(f"Ralat dalam route: {e}")
+
+        return f"<h3>{message}</h3>"
+
+    return render_template_string(html_page)
+
+# =======================
+# Run Server
+# =======================
+if __name__ == "__main__":
+    app.run(debug=True)
