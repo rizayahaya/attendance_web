@@ -2,62 +2,30 @@ from flask import Flask, request, render_template_string
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import os  
+import os  # Ensure this is imported
 
 app = Flask(__name__)
 
+# =======================
+# Google Sheets Setup
+# =======================
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
-creds_json = os.environ.get('GOOGLE_CREDENTIALS')  
+creds_json = os.environ.get('GOOGLE_CREDENTIALS')
 if creds_json:
-    creds = Credentials.from_service_account_info(eval("credentials.json"), scopes=scope)
+    creds = Credentials.from_service_account_info(eval(creds_json), scopes=scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("1GbLfHpdrQE8ifTVQqIpvOope6uFf-J8vs-eU0_MwgS8").sheet1  
+    sheet = client.open_by_key("1GbLfHpdrQE8ifTVQqIpvOope6uFf-J8vs-eU0_MwgS8").sheet1
 else:
     raise ValueError("GOOGLE_CREDENTIALS not set")
 
-
-if __name__ == "__main__":
-    app.run(debug=False)  
-
-# =====================
-# Google Sheets Setup
-# =======================
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-try:
-    creds = Credentials.from_service_account_file(
-        "credentials.json",
-        scopes=scope
-    )
-    client = gspread.authorize(creds)
-except Exception as e:
-    print(f"Ralat dalam credentials: {e}")
-    exit(1)  # Hentikan aplikasi jika credentials gagal
-
-sheet_id = "1GbLfHpdrQE8ifTVQqIpvOope6uFf-J8vs-eU0_MwgS8"  # ID spreadsheet anda
-
-try:
-    sheet = client.open_by_key(sheet_id).sheet1  # Gunakan open_by_key untuk ID
-    print("Berjaya menyambung ke Google Sheets!")
-except gspread.SpreadsheetNotFound:
-    print(f"Spreadsheet dengan ID {sheet_id} tidak dijumpai. Pastikan ID betul dan dikongsi dengan service account.")
-    exit(1)
-except Exception as e:
-    print(f"Ralat menyambung ke Google Sheets: {e}")
-    exit(1)
-
-# Tambah header jika belum ada
+# Add headers if needed (same as before)
 headers = ["Nama", "No K/P", "Email", "Tarikh", "Waktu", "Completed"]
 try:
     if sheet.row_count == 0 or sheet.row_values(1) != headers:
         sheet.insert_row(headers, 1)
-        print("Header ditambah ke spreadsheet.")
 except Exception as e:
-    print(f"Ralat menambah header: {e}")
+    print(f"Header setup error: {e}")
 
 REQUIRED_DATES = {"11/02/2026", "12/02/2026", "13/02/2026"}
 
@@ -134,11 +102,7 @@ def home():
         waktu = datetime.now().strftime("%H:%M:%S")
 
         try:
-            # Simpan data ke Google Sheets
             sheet.append_row([nama, nokp, email, tarikh, waktu, ""])
-            print(f"Data disimpan: {nama}, {nokp}, {tarikh}")
-
-            # Semak kehadiran penuh (pilihan)
             all_rows = sheet.get_all_records()
             attendance_dict = {}
             for row in all_rows:
@@ -157,17 +121,16 @@ def home():
                 message = f"Terima kasih {nama}, anda telah hadir semua hari. Layak terima sijil!"
             else:
                 message = f"Terima kasih {nama}, kehadiran anda pada {tarikh} jam {waktu} telah direkod!"
-
         except Exception as e:
-            message = f"Ralat menyimpan data: {e}. Cuba lagi."
-            print(f"Ralat dalam route: {e}")
+            message = f"Ralat menyimpan data: {e}"
 
         return f"<h3>{message}</h3>"
 
     return render_template_string(html_page)
 
 # =======================
-# Run Server
+# Run Server (Updated for Railway)
 # =======================
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Railway sets PORT; default to 5000 for local
+    app.run(host="0.0.0.0", port=port, debug=False)
